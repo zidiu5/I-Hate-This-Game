@@ -1,0 +1,333 @@
+-- Services
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- ===================== GUI Setup =====================
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "LoSGUI"
+ScreenGui.ResetOnSpawn = false
+
+-- Main Frame
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 500, 0, 350)
+Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Visible = false
+
+-- TopBar
+local TopBar = Instance.new("Frame", Frame)
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "PSX Copy"
+Title.TextColor3 = Color3.fromRGB(255, 0, 0)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+
+-- MiniBox
+local MiniBox = Instance.new("TextButton", ScreenGui)
+MiniBox.Size = UDim2.new(0, 60, 0, 30)
+MiniBox.Position = UDim2.new(0, 20, 0, 20)
+MiniBox.Text = "LoS"
+MiniBox.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+MiniBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+MiniBox.Font = Enum.Font.GothamBold
+MiniBox.TextSize = 16
+
+MiniBox.MouseButton1Click:Connect(function()
+    Frame.Visible = not Frame.Visible
+end)
+
+-- ===================== Dragging for both =====================
+local function makeDraggable(obj)
+    local dragging, dragInput, dragStart, startPos
+
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = obj.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    obj.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+makeDraggable(Frame)
+makeDraggable(MiniBox)
+
+-- ===================== Sidebar & Tabs =====================
+local SideBar = Instance.new("Frame", Frame)
+SideBar.Size = UDim2.new(0, 100, 1, -30)
+SideBar.Position = UDim2.new(0, 0, 0, 30)
+SideBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+
+local ContentFrame = Instance.new("Frame", Frame)
+ContentFrame.Size = UDim2.new(1, -100, 1, -30)
+ContentFrame.Position = UDim2.new(0, 100, 0, 30)
+ContentFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+
+local Tabs = {}
+local currentTab
+
+local function createScrollContainer(parent)
+    local scrolling = Instance.new("ScrollingFrame", parent)
+    scrolling.Size = UDim2.new(1, 0, 1, 0)
+    scrolling.BackgroundTransparency = 1
+    scrolling.ScrollBarThickness = 6
+    scrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    return scrolling
+end
+
+local function switchTab(name)
+    for tabName, tab in pairs(Tabs) do
+        tab.Visible = (tabName == name)
+    end
+    currentTab = name
+end
+
+local Sections = {"AutoFarm"}
+for i, section in ipairs(Sections) do
+    local btn = Instance.new("TextButton", SideBar)
+    btn.Size = UDim2.new(1,0,0,30)
+    btn.Position = UDim2.new(0,0,0,(i-1)*30)
+    btn.BackgroundColor3 = Color3.fromRGB(40,0,0)
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Text = section
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.AutoButtonColor = false
+    btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(60,0,0) end)
+    btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(40,0,0) end)
+    btn.MouseButton1Click:Connect(function() switchTab(section) end)
+
+    local tabFrame = createScrollContainer(ContentFrame)
+    tabFrame.Visible = false
+    Tabs[section] = tabFrame
+end
+
+switchTab("AutoFarm")
+
+-- ===================== AutoFarm Tab =====================
+local tab = Tabs["AutoFarm"]
+local container = Instance.new("Frame", tab)
+container.Size = UDim2.new(1,0,1,0)
+container.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", container)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0,10)
+
+-- ===== Farm Radius =====
+local labelRadius = Instance.new("TextLabel", container)
+labelRadius.Size = UDim2.new(1, -20, 0, 25)
+labelRadius.BackgroundTransparency = 1
+labelRadius.TextColor3 = Color3.fromRGB(255,255,255)
+labelRadius.Text = "Farm Radius:"
+
+local radiusBox = Instance.new("TextBox", container)
+radiusBox.Size = UDim2.new(1, -20, 0, 25)
+radiusBox.BackgroundColor3 = Color3.fromRGB(70,70,70)
+radiusBox.TextColor3 = Color3.fromRGB(255,255,255)
+radiusBox.Text = "50"
+radiusBox.ClearTextOnFocus = false
+
+local toggleRadiusBtn = Instance.new("TextButton", container)
+toggleRadiusBtn.Size = UDim2.new(1, -20, 0, 30)
+toggleRadiusBtn.BackgroundColor3 = Color3.fromRGB(80,0,0)
+toggleRadiusBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleRadiusBtn.Text = "Radius Farm: OFF"
+
+-- ===== Area Farm =====
+local areaDropdown = Instance.new("TextButton", container)
+areaDropdown.Size = UDim2.new(1, -20, 0, 25)
+areaDropdown.BackgroundColor3 = Color3.fromRGB(70,70,70)
+areaDropdown.TextColor3 = Color3.fromRGB(255,255,255)
+areaDropdown.Text = "None"
+
+local toggleAreaBtn = Instance.new("TextButton", container)
+toggleAreaBtn.Size = UDim2.new(1, -20, 0, 30)
+toggleAreaBtn.BackgroundColor3 = Color3.fromRGB(80,0,0)
+toggleAreaBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleAreaBtn.Text = "Area Farm: OFF"
+
+-- ===== Auto Collect (Teleport) =====
+local toggleAutoCollectBtn = Instance.new("TextButton", container)
+toggleAutoCollectBtn.Size = UDim2.new(1, -20, 0, 30)
+toggleAutoCollectBtn.BackgroundColor3 = Color3.fromRGB(80,0,0)
+toggleAutoCollectBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleAutoCollectBtn.Text = "Auto Collect: OFF"
+
+-- ===== Logic =====
+local radiusFarmEnabled = false
+local areaFarmEnabled = false
+local autoCollectEnabled = false
+local farmRadius = 50
+local selectedArea = nil
+
+toggleRadiusBtn.MouseButton1Click:Connect(function()
+    radiusFarmEnabled = not radiusFarmEnabled
+    toggleRadiusBtn.Text = radiusFarmEnabled and "Radius Farm: ON" or "Radius Farm: OFF"
+end)
+
+toggleAreaBtn.MouseButton1Click:Connect(function()
+    areaFarmEnabled = not areaFarmEnabled
+    toggleAreaBtn.Text = areaFarmEnabled and "Area Farm: ON" or "Area Farm: OFF"
+end)
+
+toggleAutoCollectBtn.MouseButton1Click:Connect(function()
+    autoCollectEnabled = not autoCollectEnabled
+    toggleAutoCollectBtn.Text = autoCollectEnabled and "Auto Collect: ON" or "Auto Collect: OFF"
+    toggleAutoCollectBtn.BackgroundColor3 = autoCollectEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(80,0,0)
+end)
+
+radiusBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local value = tonumber(radiusBox.Text)
+    if value then farmRadius = value end
+end)
+
+-- Area dropdown
+areaDropdown.MouseButton1Click:Connect(function()
+    local coinsFolder = workspace.__THINGS:FindFirstChild("Coins")
+    if not coinsFolder then return end
+    local areaSet = {}
+    for _, coin in pairs(coinsFolder:GetChildren()) do
+        local area = coin:GetAttribute("Area")
+        if area and not areaSet[area] then areaSet[area] = true end
+    end
+    local list = {}
+    for areaName in pairs(areaSet) do table.insert(list, areaName) end
+    table.sort(list)
+
+    local menu = Instance.new("Frame", container)
+    menu.Size = UDim2.new(0, areaDropdown.AbsoluteSize.X, 0, #list*25)
+    menu.Position = areaDropdown.Position + UDim2.new(0,0,0,areaDropdown.AbsoluteSize.Y)
+    menu.BackgroundColor3 = Color3.fromRGB(60,60,60)
+
+    for i, areaName in pairs(list) do
+        local btn = Instance.new("TextButton", menu)
+        btn.Size = UDim2.new(1,0,0,25)
+        btn.Position = UDim2.new(0,0,0,(i-1)*25)
+        btn.Text = areaName
+        btn.BackgroundColor3 = Color3.fromRGB(100,100,100)
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        btn.MouseButton1Click:Connect(function()
+            selectedArea = areaName
+            areaDropdown.Text = areaName
+            menu:Destroy()
+        end)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        local petsFolder = workspace.__THINGS:WaitForChild("Pets")
+        local coinsFolder = workspace.__THINGS:FindFirstChild("Coins")
+        if not coinsFolder then continue end
+
+        local myPets = {}
+        for _, pet in pairs(petsFolder:GetChildren()) do
+            local owner = pet:GetAttribute("Owner")
+            if owner == player or owner == player.Name or tostring(owner) == tostring(player.UserId) or tostring(owner):find(player.Name) then
+                table.insert(myPets, pet.Name)
+            end
+        end
+
+        -- Radius Farm
+        if radiusFarmEnabled then
+            local availableCoins = {}
+            for _, coin in pairs(coinsFolder:GetChildren()) do
+                if coin:FindFirstChild("POS") then
+                    local distance = (player.Character.PrimaryPart.Position - coin.POS.Position).Magnitude
+                    if distance <= farmRadius then
+                        table.insert(availableCoins, coin)
+                    end
+                end
+            end
+            for i, petId in pairs(myPets) do
+                local coin = availableCoins[i]
+                if coin then
+                    local coinId = coin.Name
+                    local joinArgs = {{{coinId,{petId}},{false,false}}}
+                    pcall(function() workspace.__THINGS.__REMOTES["join coin"]:InvokeServer(unpack(joinArgs)) end)
+                    local farmArgs = {{{coinId,petId},{false,false}}}
+                    pcall(function() workspace.__THINGS.__REMOTES["ur_lame_xd"]:FireServer(unpack(farmArgs)) end)
+                end
+            end
+        end
+
+        if areaFarmEnabled and selectedArea then
+            local availableCoins = {}
+            for _, coin in pairs(coinsFolder:GetChildren()) do
+                if coin:GetAttribute("Area") == selectedArea then
+                    table.insert(availableCoins, coin)
+                end
+            end
+            for i, petId in pairs(myPets) do
+                local coin = availableCoins[i]
+                if coin then
+                    local coinId = coin.Name
+                    local joinArgs = {{{coinId,{petId}},{false,false}}}
+                    pcall(function() workspace.__THINGS.__REMOTES["join coin"]:InvokeServer(unpack(joinArgs)) end)
+                    local farmArgs = {{{coinId, petId},{false,false}}}
+                    pcall(function() workspace.__THINGS.__REMOTES["ur_lame_xd"]:FireServer(unpack(farmArgs)) end)
+                end
+            end
+        end
+
+        if autoCollectEnabled then
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                local orbs = workspace.__THINGS:FindFirstChild("Orbs")
+                if orbs then
+                    for _, orb in pairs(orbs:GetChildren()) do
+                        if orb:IsA("BasePart") then
+                            orb.CFrame = hrp.CFrame
+                        elseif orb:IsA("Model") and orb.PrimaryPart then
+                            orb:SetPrimaryPartCFrame(hrp.CFrame)
+                        end
+                    end
+                end
+                local lootbags = workspace.__THINGS:FindFirstChild("Lootbags")
+                if lootbags then
+                    for _, bag in pairs(lootbags:GetChildren()) do
+                        if bag:IsA("BasePart") then
+                            bag.CFrame = hrp.CFrame
+                        elseif bag:IsA("Model") and bag.PrimaryPart then
+                            bag:SetPrimaryPartCFrame(hrp.CFrame)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
